@@ -3,15 +3,31 @@ config {
   schema: "silver",
   name: "users",
   uniqueKey: ["user_id"],  
-  assertations: {
+  assertions: {
     uniqueKey: ["user_id"],  
     nonNull: ["user_id"]
   },
   dependencies: ["bootstrap"],
   bigquery: {
     clusterBy: ["user_id"]
-  }
+  },
   description: "Incremental upsert of users from bronze.users",
+  tags: ["silver", "users"],
+  columns: {
+    user_id: "Unique user identifier",
+    first_name: "Cleaned user first name",
+    last_name: "Cleaned user last name",
+    __ingested_at__: "Timestamp when the record was processed into the silver layer"
+  },
+  metadata: {
+    overview: "Incremental upsert of users from bronze.users with cleaned attributes. Data quality rules: user_id must be unique and non-null.",
+    extraProperties: {
+      generic: {
+        type: "dimension table",
+        system: "users"
+      }
+    }
+  }
 }
 
 WITH cleaned AS (
@@ -38,4 +54,9 @@ dedup AS (
   GROUP BY user_id
 )
 
-SELECT * FROM dedup
+SELECT
+  user_id,
+  first_name,
+  last_name,
+  CURRENT_TIMESTAMP() AS __ingested_at__
+FROM dedup
