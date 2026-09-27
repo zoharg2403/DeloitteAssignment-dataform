@@ -1,25 +1,49 @@
 config {
-  type: "table",
+  type: "incremental",
   schema: "gold",
-  name: "gold_users_address",
-  description: "user profile combining latest user attributes with corresponding address details",
-  uniqueKey: ["user_id"],
-  dependencies: ["bootstrap", "silver_users", "silver_address"],
+  name: "users_address",
+  uniqueKey: ["user_id"],  
+  assertions: {
+    uniqueKey: ["user_id"],  
+    nonNull: ["user_id"]
+  },
+  dependencies: ["bootstrap"],
   bigquery: {
-    partitionBy: "DATE(_ingested_at)",
-    clusterBy: ["city"]
+    clusterBy: ["user_id", "city"]
+  },
+  description: "Unified user profile combining user attributes with corresponding address details",
+  tags: ["gold", "users", "address"],
+  columns: {
+    user_id: "Unique user identifier",
+    first_name: "User first name",
+    last_name: "User last name",
+    country: "User country of residence",
+    region: "User state or region",
+    city: "User city",
+    address: "User street address",
+    __ingested_at__: "Timestamp when the record was processed into the gold layer"
+  },
+  metadata: {
+    overview: "Unified user profile combining user attributes with corresponding address details. Data quality rules: user_id must be unique and non-null.",
+    extraProperties: {
+      generic: {
+        type: "dimension table",
+        system: "users"
+      }
     }
+  }
 }
 
 SELECT
-  u.user_id,
-  u.first_name,
-  u.last_name,
-  a.country,
-  a.region,
-  a.city,
-  a.address,
-  greatest(u._ingested_at, a._ingested_at) as _ingested_at
-FROM ${ref("silver_users")} AS u
-LEFT JOIN ${ref("silver_address")} AS a
-ON u.user_id = a.user_id
+  u.user_id, u.first_name, u.last_name,
+  a.country, a.region, a.city, a.address,
+  CURRENT_TIMESTAMP() AS __ingested_at__
+FROM ${ref("silver", "users")} AS u
+LEFT JOIN ${ref("silver", "address")} AS a
+  ON u.user_id = a.user_id
+${when(incremental(), `
+  WHERE GREATER(u.__ingested_at__, a.__ingested_at__) > COALESCE(
+    (SELECT MAX(__ingested_at__) FROM ${self()}),
+    TIMESTAMP '2026-01-01 00:00:00+00'
+  )
+`)}
