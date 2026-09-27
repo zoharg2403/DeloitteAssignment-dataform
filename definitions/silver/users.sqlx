@@ -9,7 +9,6 @@ config {
   },
   dependencies: ["bootstrap"],
   bigquery: {
-    partitionBy: "DATE(__ingested_at__)",
     clusterBy: ["user_id"]
   }
   description: "Incremental upsert of users from bronze.users",
