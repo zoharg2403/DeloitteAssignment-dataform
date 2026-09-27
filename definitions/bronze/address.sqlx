@@ -2,4 +2,5 @@ config {
   type: "declaration",
   schema: "bronze",
   name: "address",
+  description: "bronze.address table loaded using data_ingestion/gcs_ingestion.py job",
 }
