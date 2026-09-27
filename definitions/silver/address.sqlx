@@ -1,32 +1,43 @@
 config {
   type: "incremental",
   schema: "silver",
-  name: "silver_address",
-  uniqueKey: ["user_id"],
+  name: "address",
+  uniqueKey: ["user_id"],  
+  assertations: {
+    uniqueKey: ["user_id"],  
+    nonNull: ["user_id"]
+  },
   dependencies: ["bootstrap"],
-  description: "Incremental upsert of curated address records from bronze.address",
   bigquery: {
-    partitionBy: "DATE(_ingested_at)",
-    clusterBy: ["city"]
+    partitionBy: "DATE(__ingested_at__)",
+    clusterBy: ["user_id"]
   }
+  description: "Incremental upsert of address from bronze.address",
 }
 
-WITH bronze_clean AS (
+WITH cleaned AS (
   SELECT 
-    SAFE_CAST(user_id AS INTEGER) AS user_id,
+    SAFE_CAST(user_id AS INT64) AS user_id,
     TRIM(SAFE_CAST(country AS STRING)) AS country,
     TRIM(SAFE_CAST(city AS STRING)) AS city,
     TRIM(SAFE_CAST(region AS STRING)) AS region,
     TRIM(SAFE_CAST(address AS STRING)) AS address,
-    CURRENT_TIMESTAMP() AS _ingested_at
-  FROM ${ref("bronze_address")}
-  WHERE user_id IS NOT NULL
+    __ingested_at__
+  FROM ${ref("bronze", "address")}
+  
+  ${when(incremental(), `
+    WHERE SAFE_CAST(user_id AS INT64) IS NOT NULL 
+    AND __ingested_at__ > COALESCE(
+      (SELECT MAX(__ingested_at__) FROM ${self()}), 
+      TIMESTAMP '2026-01-01 00:00:00+00'
+      )
+  `)}
 ),
 
 dedup AS (
   SELECT AS VALUE
-    ARRAY_AGG(bronze_clean ORDER BY _ingested_at DESC)[OFFSET(0)]  -- pick the latest row per user_id
-  FROM bronze_clean
+    ARRAY_AGG(cleaned ORDER BY __ingested_at__ DESC)[OFFSET(0)]
+  FROM cleaned
   GROUP BY user_id
 )
 

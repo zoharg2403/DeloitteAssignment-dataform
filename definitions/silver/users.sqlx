@@ -1,31 +1,42 @@
 config {
-    type: "incremental",
-    schema: "silver",
-    name: "silver_users",
-    uniqueKey: ["user_id"],
-    dependencies: ["bootstrap"],
-    description: "Incremental upsert of users from bronze.users",
-    bigquery: {
-        partitionBy: "DATE(_ingested_at)",
-        clusterBy: ["user_id"]
-    }
+  type: "incremental",
+  schema: "silver",
+  name: "users",
+  uniqueKey: ["user_id"],  
+  assertations: {
+    uniqueKey: ["user_id"],  
+    nonNull: ["user_id"]
+  },
+  dependencies: ["bootstrap"],
+  bigquery: {
+    partitionBy: "DATE(__ingested_at__)",
+    clusterBy: ["user_id"]
+  }
+  description: "Incremental upsert of users from bronze.users",
 }
 
-WITH bronze_clean AS (
+WITH cleaned AS (
   SELECT
-    SAFE_CAST(user_id AS INTEGER) AS user_id,
+    SAFE_CAST(user_id AS INT64) AS user_id,
     TRIM(SAFE_CAST(firstName AS STRING)) AS first_name,
     TRIM(SAFE_CAST(lastName AS STRING)) AS last_name,
-    CURRENT_TIMESTAMP() AS _ingested_at
-  FROM ${ref("bronze_users")}
-  WHERE user_id IS NOT NULL 
+    __ingested_at__
+  FROM ${ref("bronze", "users")}
+
+  ${when(incremental(), `
+    WHERE SAFE_CAST(user_id AS INT64) IS NOT NULL 
+    AND __ingested_at__ > COALESCE(
+      (SELECT MAX(__ingested_at__) FROM ${self()}), 
+      TIMESTAMP '2026-01-01 00:00:00+00'
+      )
+  `)}
 ),
   
 dedup AS (
   SELECT AS VALUE
-    ARRAY_AGG(bronze_clean ORDER BY _ingested_at DESC)[OFFSET(0)]  -- pick the latest row per user_id
-  FROM bronze_clean
-  GROUP BY user_id 
+    ARRAY_AGG(cleaned ORDER BY __ingested_at__ DESC)[OFFSET(0)]
+  FROM cleaned
+  GROUP BY user_id
 )
 
 SELECT * FROM dedup
