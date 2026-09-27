@@ -1,6 +1,5 @@
 config {
   type: "declaration",
   schema: "bronze",
-  name: "bronze_users",
-  description: "Raw users loaded from GCS via data transfer"
+  name: "users",
 }
