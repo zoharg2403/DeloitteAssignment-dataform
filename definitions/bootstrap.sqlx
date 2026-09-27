@@ -1,7 +1,8 @@
 config {
   type: "operations",
   hasOutput: false,
-  description: "Bootstrap script to create datasets if doesn't exists" 
+  description: "Bootstrap script to create datasets if doesn't exists", 
+  tags: ["bootstrap"]
 }
 
 CREATE SCHEMA IF NOT EXISTS `bronze`;
