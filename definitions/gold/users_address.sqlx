@@ -42,7 +42,7 @@ FROM ${ref("silver", "users")} AS u
 LEFT JOIN ${ref("silver", "address")} AS a
   ON u.user_id = a.user_id
 ${when(incremental(), `
-  WHERE GREATER(u.__ingested_at__, a.__ingested_at__) > COALESCE(
+  WHERE GREATEST(u.__ingested_at__, a.__ingested_at__) > COALESCE(
     (SELECT MAX(__ingested_at__) FROM ${self()}),
     TIMESTAMP '2026-01-01 00:00:00+00'
   )
