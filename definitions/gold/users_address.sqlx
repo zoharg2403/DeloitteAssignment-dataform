@@ -39,7 +39,7 @@ SELECT
   a.country, a.region, a.city, a.address,
   CURRENT_TIMESTAMP() AS __ingested_at__
 FROM ${ref("silver", "users")} AS u
-LEFT JOIN ${ref("silver", "address")} AS a
+INNER JOIN ${ref("silver", "address")} AS a
   ON u.user_id = a.user_id
 ${when(incremental(), `
   WHERE GREATEST(u.__ingested_at__, a.__ingested_at__) > COALESCE(
